@@ -21,6 +21,6 @@ func (Material) Fields() []ent.Field {
 func (Material) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("partners", Partner.Type).
-			Ref("Partner"),
+			Ref("materials"),
 	}
 }
