@@ -13,6 +13,7 @@ type Location struct {
 
 // Todo: add expected format to errors
 // Todo: add a proper format checker/handler
+// Note, we are handling user input here, make sure to properly escape logs.
 func New(location string) (Location, error) {
 	parts := strings.Split(location, ":")
 	if len(parts) != 2 {
