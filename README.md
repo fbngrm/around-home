@@ -122,7 +122,6 @@ A few things that I would implement as the next steps are:
 - Customer management
 - Storing of request, associated with customers
 - Health/Readiness endpoints
-- Complete graceful shutdown
 - Observability (metrics, tracing)
 - TLS support
 
