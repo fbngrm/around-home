@@ -45,18 +45,19 @@ func main() {
 		cancel()
 	}()
 
+	// http
 	httpServer, err := http.NewServer(ctx, grpcEndpoint)
 	if err != nil {
 		log.Printf("could not init http server: %v\n", err)
 		os.Exit(1)
 	}
-
 	go func() {
 		if err := httpServer.Run(); err != nil {
 			log.Printf("%+v", err)
 		}
 	}()
 
+	// grpc
 	grpcServer, err := grpc.NewServer(ctx, db)
 	if err != nil {
 		log.Printf("could not init grpc server: %v\n", err)
