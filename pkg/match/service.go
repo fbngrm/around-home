@@ -3,74 +3,53 @@ package match
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
 
-	apiv1 "github.com/fbngrm/around-home/gen/proto/go/match/v1"
+	"github.com/fbngrm/around-home/pkg/location"
+	latLong "github.com/fbngrm/around-home/pkg/location"
 	"github.com/fbngrm/around-home/pkg/materials"
 	"github.com/fbngrm/around-home/pkg/partner"
 )
 
-type partnerMatchService struct {
-	partnerRepo PartnerRepo
+type MatchService struct {
+	partnerRepo     PartnerRepo
+	locationService LocationService
 }
 
-func NewPartnerService(partnerRepo PartnerRepo) *partnerMatchService {
-	return &partnerMatchService{
-		partnerRepo: partnerRepo,
+func NewMatchService(pr PartnerRepo, ls LocationService) *MatchService {
+	return &MatchService{
+		partnerRepo:     pr,
+		locationService: ls,
 	}
 }
 
-func (p *partnerMatchService) MatchPartnersWithRequest(ctx context.Context, req *apiv1.ListPartnersForTaskRequest) (*apiv1.ListPartnersForTaskResponse, error) {
-	// we need to take special care here since all request input is potentially harmful
-	// thus, we cannot just assert a type to the req.Material
-	material, err := materials.NewMaterial(req.Material)
+func (p *MatchService) GetMatches(ctx context.Context, m materials.Material, location string) (Matches, error) {
+	requestLocation, err := latLong.New(location)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse material: %w", err)
+		return nil, fmt.Errorf("could not parse customer location from request: %w", err)
 	}
 
-	l := ToLocation(req.Location)
-
-	partners, err := p.partnerRepo.GetPartnersWithMaterial(ctx, material)
+	partnersWithMaterial, err := p.partnerRepo.GetPartnersWithMaterial(ctx, m)
 	if err != nil {
-		return nil, fmt.Errorf("could not get partners with material [%v]: %w", material, err)
+		return nil, fmt.Errorf("could not get partners with material [%v]: %w", m, err)
 	}
 
-	return &apiv1.ListPartnersForTaskResponse{}, nil
+	partnersInRadius := p.getMatchesInOperatingRadius(ctx, partnersWithMaterial, requestLocation)
+	partnersInRadius.sortByRatingAndDistance()
+
+	return partnersInRadius, nil
 }
 
-type Match struct {
-	partner  partner.Partner
-	distance int
-}
-
-type Location struct {
-	Lat  float64
-	Lang float64
-}
-
-func ToLocation(location string) (Location, error) {
-	parts := strings.Split(location, "/")
-	if len(parts) != 2 {
-		return Location{}, fmt.Errorf("could not parse location [%q]", location)
+func (p *MatchService) getMatchesInOperatingRadius(ctx context.Context, partners []partner.Partner, requestLocation location.Location) Matches {
+	var operatingInRadius Matches
+	for _, partner := range partners {
+		distance := p.locationService.CalculateDistance(partner.Address, requestLocation)
+		if !p.locationService.IsInOperationRadius(distance, partner.RadiusOfOperation) {
+			continue
+		}
+		operatingInRadius = append(operatingInRadius, Match{
+			Partner:  partner,
+			Distance: distance,
+		})
 	}
-	value, err := strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return Location{}, fmt.Errorf("could not parse lat [%q]", location)
-	}
-	lat := float64(value)
-	value, err = strconv.ParseFloat(parts[1], 64)
-	if err != nil {
-		return Location{}, fmt.Errorf("could not parse long [%q]", location)
-	}
-	long := float64(value)
-	return Location{
-		Lat:  lat,
-		Long: long,
-	}, nil
-}
-
-func (p *partnerMatchService) GetPartnersInOperatingRadius(ctx context.Context, partners []partner.Partner, location Location) ([]partner.Partner, error) {
-
-	return nil, nil
+	return operatingInRadius
 }
