@@ -19,7 +19,7 @@ import (
 	"github.com/fbngrm/around-home/pkg/location"
 	"github.com/fbngrm/around-home/pkg/match"
 	"github.com/fbngrm/around-home/pkg/partner"
-	"github.com/fbngrm/around-home/server/internal/api"
+	"github.com/fbngrm/around-home/server/api"
 	"github.com/fbngrm/around-home/server/internal/postgres"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
