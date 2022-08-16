@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -13,6 +14,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// TODO: add config
+const port = "8081"
 const openApiPrefix = "/openapi"
 
 type Server struct {
@@ -42,9 +45,6 @@ func NewServer(ctx context.Context, grpcEndpoint string) (*Server, error) {
 		return nil, fmt.Errorf("could not register mux router with gRPC endpoint: %v", err)
 	}
 
-	// add config
-	port := "8081"
-
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
 		Handler:      mux,
@@ -56,6 +56,7 @@ func NewServer(ctx context.Context, grpcEndpoint string) (*Server, error) {
 }
 
 func (s *Server) Run() error {
+	log.Printf("HTTP listening on :%s\n", port)
 	return s.server.ListenAndServe()
 }
 

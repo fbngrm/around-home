@@ -2,26 +2,18 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
-	"fmt"
 	"log"
-	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	// This import path is based on the name declaration in the go.mod,
-	// and the gen/proto/go output location in the buf.gen.yaml.
-	ent "github.com/fbngrm/around-home/ent"
-	apiv1 "github.com/fbngrm/around-home/gen/proto/go/match/v1"
 	"github.com/fbngrm/around-home/pkg/database"
-	"github.com/fbngrm/around-home/pkg/location"
-	"github.com/fbngrm/around-home/pkg/match"
-	"github.com/fbngrm/around-home/pkg/partner"
-	"github.com/fbngrm/around-home/server/api"
+	"github.com/fbngrm/around-home/server/grpc"
 	"github.com/fbngrm/around-home/server/http"
 	"github.com/fbngrm/around-home/server/internal/postgres"
-
-	"google.golang.org/grpc"
 )
 
 var (
@@ -29,7 +21,7 @@ var (
 )
 
 func main() {
-	flag.StringVar(&grpcEndpoint, "grpc-endpoint", "localhost:8080", "gRPC server endpoint")
+	flag.StringVar(&grpcEndpoint, "grpc-endpoint", ":8080", "gRPC server endpoint")
 	flag.Parse()
 
 	// TODO: use functional options here to avoid empty config
@@ -41,17 +33,17 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// quitCh := make(chan os.Signal, 1)
-	// // interrupt signal sent from terminal
-	// signal.Notify(quitCh, os.Interrupt)
-	// // sigterm signal sent from kubernetes or docker
-	// signal.Notify(quitCh, syscall.SIGTERM)
+	quitCh := make(chan os.Signal, 1)
+	// interrupt signal sent from terminal
+	signal.Notify(quitCh, os.Interrupt)
+	// sigterm signal sent from kubernetes or docker
+	signal.Notify(quitCh, syscall.SIGTERM)
 
-	// go func() {
-	// 	sig := <-quitCh
-	// 	log.Printf("received interrupt %s, shutting down...\n", sig)
-	// 	cancel()
-	// }()
+	go func() {
+		sig := <-quitCh
+		log.Printf("received signal %s:, shutting down...\n", sig)
+		cancel()
+	}()
 
 	httpServer, err := http.NewServer(ctx, grpcEndpoint)
 	if err != nil {
@@ -60,68 +52,53 @@ func main() {
 	}
 
 	go func() {
-		for i := 0; i < 10; i++ {
-			if err := httpServer.Run(); err != nil {
-				log.Printf("%+v", err)
-			}
-			time.Sleep(time.Millisecond * 100)
+		if err := httpServer.Run(); err != nil {
+			log.Printf("%+v", err)
 		}
-		log.Fatal("HTTP Gateway shutdown")
 	}()
 
-	if err := runGRPC(db); err != nil {
-		log.Fatal(err)
-	}
-
-	cancel()
-	log.Fatal("GRPC shutdown")
-}
-
-func runGRPC(db *ent.Client) error {
-	partnerRepo := &partner.Repo{DB: db}
-	locationService := location.NewService(&location.HaversineCalculator{})
-	matchService := match.NewMatchService(partnerRepo, locationService)
-	api := api.NewApi(matchService)
-
-	// note, not a production ready config
-	server := grpc.NewServer()
-	apiv1.RegisterMatchServiceServer(server, api)
-
-	listener, err := net.Listen("tcp", grpcEndpoint)
+	grpcServer, err := grpc.NewServer(ctx, db)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", grpcEndpoint, err)
+		log.Printf("could not init grpc server: %v\n", err)
+		os.Exit(1)
+	}
+	go func() {
+		if err := grpcServer.Run(grpcEndpoint); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	<-ctx.Done() // wait for shutdown signal
+
+	// we want to give the shutdown a timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+
+	go func() {
+		<-shutdownCtx.Done()
+		if errors.Is(shutdownCtx.Err(), context.Canceled) {
+			return
+		}
+		log.Printf("couldn't shutdown gracefully: %v", shutdownCtx.Err())
+		os.Exit(1)
+	}()
+
+	// shutdown
+	graceful := true
+	if err := httpServer.Shutdown(ctx); err != nil {
+		graceful = false
+		log.Printf("error shutting down http server: %q\n", err)
+	}
+	grpcServer.Shutdown()
+	if err := db.Close(); err != nil {
+		graceful = false
+		log.Printf("error shutting down database: %q\n", err)
 	}
 
-	log.Println("gRPC listening on", grpcEndpoint)
-	if err := server.Serve(listener); err != nil {
-		return fmt.Errorf("failed to serve gRPC server: %w", err)
-	}
+	shutdownCancel()
+	log.Println("shutdown complete")
 
-	return nil
+	if graceful {
+		os.Exit(0)
+	}
+	os.Exit(1)
 }
-
-// func runHTTP() error {
-// 	ctx := context.Background()
-// 	ctx, cancel := context.WithCancel(ctx)
-// 	defer cancel()
-
-// 	mux := runtime.NewServeMux()
-
-// 	// openapi documentation.
-// 	fs := http.FileServer(http.Dir("./apis/ui"))
-// 	if err := mux.HandlePath("GET", openApiPrefix+".json", handleOpenapiDescription); err != nil {
-// 		log.Fatal("add to mux openapi json", err)
-// 	}
-// 	if err := mux.HandlePath("GET", openApiPrefix+"/*", handler(http.StripPrefix(openApiPrefix, fs))); err != nil {
-// 		log.Fatal("add to mux openapi", err)
-// 	}
-
-// 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-// 	err := gw.RegisterMatchServiceHandlerFromEndpoint(ctx, mux, grpcEndpoint, opts)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	listenOn := ":8081"
-// 	log.Println("HTTP listening on", listenOn)
-// 	return http.ListenAndServe(listenOn, mux)
-// }
