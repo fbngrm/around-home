@@ -18,6 +18,8 @@ func NewApi(matchService Matcher) *Api {
 	}
 }
 
+// the error handling is overly simplified here due to time constraints.
+// internal errors must not be exposed to the outside world.
 func (a *Api) MatchPartnersWithRequest(ctx context.Context, req *apiv1.MatchPartnersWithRequestInput) (*apiv1.MatchPartnersWithRequestOutput, error) {
 	// we need to take special care here since all request input is potentially harmful
 	// thus, we cannot just assert a type to the req.Material
@@ -34,11 +36,12 @@ func (a *Api) MatchPartnersWithRequest(ctx context.Context, req *apiv1.MatchPart
 	results := make([]*apiv1.Partner, len(matches))
 	for i, m := range matches {
 		results[i] = &apiv1.Partner{
-			Id:       uint32(m.Partner.ID),
-			Rating:   uint32(m.Partner.Rating),
-			Location: m.Partner.Address.String(),
-			Radius:   m.Partner.RadiusOfOperation,
-			Distance: m.Distance,
+			Id:        uint32(m.Partner.ID),
+			Rating:    uint32(m.Partner.Rating),
+			Location:  m.Partner.Address.String(),
+			Radius:    m.Partner.RadiusOfOperation,
+			Distance:  m.Distance,
+			Materials: m.Partner.MaterialsToString(),
 		}
 	}
 	return &apiv1.MatchPartnersWithRequestOutput{Partner: results}, nil
