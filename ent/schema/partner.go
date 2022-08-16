@@ -12,10 +12,9 @@ type Partner struct {
 
 func (Partner) Fields() []ent.Field {
 	return []ent.Field{
-		field.String("name").NotEmpty(),
 		field.String("address").NotEmpty(),
-		field.Int("rating").NotEmpty(),
-		field.Int("radiusOfOperation").NotEmpty(),
+		field.Int("rating"),
+		field.Float("radiusOfOperation"),
 	}
 }
 
