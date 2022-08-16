@@ -30,13 +30,11 @@ import (
 const openApiPrefix = "/openapi"
 
 var (
-	// command-line options:
-	// gRPC server endpoint
-	grpcEndpoint = flag.String("grpc-server-endpoint", "localhost:8080", "gRPC server endpoint")
+	grpcEndpoint string
 )
 
 func main() {
-	// flag.StringVar(&grpcEndpoint, "grpc-endpoint", "localhost:8080", "gRPC server endpoint")
+	flag.StringVar(&grpcEndpoint, "grpc-endpoint", "localhost:8080", "gRPC server endpoint")
 	flag.Parse()
 
 	// TODO: use functional options here to avoid empty config
@@ -46,7 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// quitCh := make(chan os.Signal, 1)
 	// // interrupt signal sent from terminal
@@ -60,9 +58,15 @@ func main() {
 	// 	cancel()
 	// }()
 
+	httpServer, err := NewServer(ctx)
+	if err != nil {
+		log.Printf("could not init http server: %v\n", err)
+		os.Exit(1)
+	}
+
 	go func() {
 		for i := 0; i < 10; i++ {
-			if err := runHTTP(); err != nil {
+			if err := httpServer.Run(); err != nil {
 				log.Printf("%+v", err)
 			}
 			time.Sleep(time.Millisecond * 100)
@@ -73,33 +77,9 @@ func main() {
 	if err := runGRPC(db); err != nil {
 		log.Fatal(err)
 	}
+
+	cancel()
 	log.Fatal("GRPC shutdown")
-}
-
-func runHTTP() error {
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	mux := runtime.NewServeMux()
-
-	// openapi documentation.
-	fs := http.FileServer(http.Dir("./apis/ui"))
-	if err := mux.HandlePath("GET", openApiPrefix+".json", handleOpenapiDescription); err != nil {
-		log.Fatal("add to mux openapi json", err)
-	}
-	if err := mux.HandlePath("GET", openApiPrefix+"/*", handleHandler(http.StripPrefix(openApiPrefix, fs))); err != nil {
-		log.Fatal("add to mux openapi", err)
-	}
-
-	fmt.Println(*grpcEndpoint)
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	err := gw.RegisterMatchServiceHandlerFromEndpoint(ctx, mux, *grpcEndpoint, opts)
-	if err != nil {
-		return err
-	}
-	listenOn := ":8081"
-	log.Println("HTTP listening on", listenOn)
-	return http.ListenAndServe(listenOn, mux)
 }
 
 func runGRPC(db *ent.Client) error {
@@ -108,15 +88,16 @@ func runGRPC(db *ent.Client) error {
 	matchService := match.NewMatchService(partnerRepo, locationService)
 	api := api.NewApi(matchService)
 
+	// note, not a production ready config
 	server := grpc.NewServer()
 	apiv1.RegisterMatchServiceServer(server, api)
 
-	listener, err := net.Listen("tcp", *grpcEndpoint)
+	listener, err := net.Listen("tcp", grpcEndpoint)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", *grpcEndpoint, err)
+		return fmt.Errorf("failed to listen on %s: %w", grpcEndpoint, err)
 	}
 
-	log.Println("gRPC listening on", *grpcEndpoint)
+	log.Println("gRPC listening on", grpcEndpoint)
 	if err := server.Serve(listener); err != nil {
 		return fmt.Errorf("failed to serve gRPC server: %w", err)
 	}
@@ -124,12 +105,40 @@ func runGRPC(db *ent.Client) error {
 	return nil
 }
 
-func handleHandler(h http.Handler) func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
+// func runHTTP() error {
+// 	ctx := context.Background()
+// 	ctx, cancel := context.WithCancel(ctx)
+// 	defer cancel()
+
+// 	mux := runtime.NewServeMux()
+
+// 	// openapi documentation.
+// 	fs := http.FileServer(http.Dir("./apis/ui"))
+// 	if err := mux.HandlePath("GET", openApiPrefix+".json", handleOpenapiDescription); err != nil {
+// 		log.Fatal("add to mux openapi json", err)
+// 	}
+// 	if err := mux.HandlePath("GET", openApiPrefix+"/*", handler(http.StripPrefix(openApiPrefix, fs))); err != nil {
+// 		log.Fatal("add to mux openapi", err)
+// 	}
+
+// 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+// 	err := gw.RegisterMatchServiceHandlerFromEndpoint(ctx, mux, grpcEndpoint, opts)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	listenOn := ":8081"
+// 	log.Println("HTTP listening on", listenOn)
+// 	return http.ListenAndServe(listenOn, mux)
+// }
+
+// implements mux.HandlerFunc, we ignore path params in this scenario.
+func handler(h http.Handler) func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
 	return func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
 		h.ServeHTTP(w, r)
 	}
 }
 
+// implements mux.HandlerFunc, we ignore path params in this scenario.
 func handleOpenapiDescription(w http.ResponseWriter, r *http.Request, _ map[string]string) {
 	content, err := os.ReadFile("gen/openapiv2/match/v1/match.swagger.json")
 	if err != nil {
@@ -142,4 +151,55 @@ func handleOpenapiDescription(w http.ResponseWriter, r *http.Request, _ map[stri
 		w.WriteHeader(500)
 		return
 	}
+}
+
+type HTTPServer struct {
+	server *http.Server
+}
+
+// NewServer returns an HTTPServer instance with a handler attached.
+// Note, handlers should implement a timeout to avoid running into transport
+// layer timeouts.
+// Add HTTP middleware here.
+func NewServer(ctx context.Context) (*HTTPServer, error) {
+	mux := runtime.NewServeMux()
+
+	// openapi documentation handler
+	fs := http.FileServer(http.Dir("./apis/ui"))
+	if err := mux.HandlePath("GET", openApiPrefix+".json", handleOpenapiDescription); err != nil {
+		return nil, fmt.Errorf("could not register openapi json endpoint: %v", err)
+	}
+	if err := mux.HandlePath("GET", openApiPrefix+"/*", handler(http.StripPrefix(openApiPrefix, fs))); err != nil {
+		return nil, fmt.Errorf("could not register openapi endpoint: %v", err)
+	}
+
+	// regiester with gRPC endpoint
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	err := gw.RegisterMatchServiceHandlerFromEndpoint(ctx, mux, grpcEndpoint, opts)
+	if err != nil {
+		return nil, fmt.Errorf("could not register mux router with gRPC endpoint: %v", err)
+	}
+
+	// add config
+	port := "8081"
+
+	server := &http.Server{
+		Addr:         fmt.Sprintf(":%s", port),
+		Handler:      mux,
+		ReadTimeout:  30 * time.Second, // deadline for reading request body
+		WriteTimeout: 30 * time.Second, // deadline for ServeHTTP
+	}
+	return &HTTPServer{server: server}, nil
+
+}
+
+func (s *HTTPServer) Run() error {
+	return s.server.ListenAndServe()
+}
+
+// Shutdown stops accepting new requests and waits for the running
+// ones to finish before returning. See net/http docs for details.
+// The provided context should have a timeout.
+func (s *HTTPServer) Shutdown(ctx context.Context) error {
+	return s.server.Shutdown(ctx)
 }
