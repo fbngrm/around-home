@@ -1,5 +1,6 @@
 # Code generation
-/ent/*
+#/gen -- commented out to avoid having the reviewer generate the code / install further deps on their machine
+#/ent/* -- commented out to avoid having the reviewer generate the code / install further deps on their machine
 !/ent/schema
 !/ent/migrations
 
