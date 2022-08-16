@@ -38,7 +38,7 @@ A tool for making HTTP requests is required as well, e.g. `cURL` or `wget`.
 The easiest way to run the app is to start it via docker-compose and access the HTTP API via cURL.
 
 ```
-just run
+just seed-and-run
 ```
 
 ```
