@@ -71,10 +71,10 @@ func seedDB(ctx context.Context, db *ent.Client) error {
 		carpet := db.Material.Create().SetMaterial(materials.Carpet).SaveX(ctx)
 
 		bulk := []*ent.PartnerCreate{
-			db.Partner.Create().SetAddress("52.519065/13.406083").SetRadiusOfOperation(10000.0).SetRating(5).AddMaterials(wood, tiles, carpet),
-			db.Partner.Create().SetAddress("52.519065/13.406083").SetRadiusOfOperation(10000.0).SetRating(4).AddMaterials(wood, tiles, carpet),
-			db.Partner.Create().SetAddress("52.532566/13.396261").SetRadiusOfOperation(100.0).SetRating(5).AddMaterials(wood, tiles),
-			db.Partner.Create().SetAddress("52.532566/13.406083").SetRadiusOfOperation(10000.0).SetRating(5).AddMaterials(carpet),
+			db.Partner.Create().SetAddress("52.519065:13.406083").SetRadiusOfOperation(10000.0).SetRating(5).AddMaterials(wood, tiles, carpet),
+			db.Partner.Create().SetAddress("52.519065:13.406083").SetRadiusOfOperation(10000.0).SetRating(4).AddMaterials(wood, tiles, carpet),
+			db.Partner.Create().SetAddress("52.532566:13.396261").SetRadiusOfOperation(100.0).SetRating(5).AddMaterials(wood, tiles),
+			db.Partner.Create().SetAddress("52.532566:13.406083").SetRadiusOfOperation(10000.0).SetRating(5).AddMaterials(carpet),
 		}
 		_, err := db.Partner.CreateBulk(bulk...).Save(ctx)
 		if err != nil {
