@@ -27,7 +27,7 @@ generate:
 	make gen/proto/go/match/v1/*.go >/dev/null
 	make ent/ent.go >/dev/null
 
-seed-and-run:
+seed-and-run: build
     docker-compose --profile seed up
 
 run:
