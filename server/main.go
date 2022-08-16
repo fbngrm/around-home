@@ -53,7 +53,7 @@ func main() {
 	}
 	go func() {
 		if err := httpServer.Run(); err != nil {
-			log.Printf("%+v", err)
+			log.Printf("error running http server: %v\n", err)
 		}
 	}()
 
@@ -65,7 +65,7 @@ func main() {
 	}
 	go func() {
 		if err := grpcServer.Run(grpcEndpoint); err != nil {
-			log.Fatal(err)
+			log.Printf("error running grpc server: %v\n", err)
 		}
 	}()
 
