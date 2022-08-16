@@ -12,8 +12,9 @@ type Location struct {
 }
 
 // Todo: add expected format to errors
+// Todo: add a proper format checker/handler
 func New(location string) (Location, error) {
-	parts := strings.Split(location, "/")
+	parts := strings.Split(location, ":")
 	if len(parts) != 2 {
 		return Location{}, fmt.Errorf("could not parse location [%q]", location)
 	}
@@ -34,5 +35,5 @@ func New(location string) (Location, error) {
 }
 
 func (l Location) String() string {
-	return fmt.Sprintf("%f/%f", l.Lat, l.Long)
+	return fmt.Sprintf("%f:%f", l.Lat, l.Long)
 }

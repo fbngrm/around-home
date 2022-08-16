@@ -28,7 +28,7 @@ func TestMatchPartnersWithRequest(t *testing.T) {
 			name: "expect 0 partner to be returned, no error",
 			req: &apiv1.MatchPartnersWithRequestInput{
 				Material: "wood",
-				Location: "52.532566/13.396261",
+				Location: "52.532566:13.396261",
 			},
 			resp: &apiv1.MatchPartnersWithRequestOutput{
 				Partner: []*apiv1.Partner{},
@@ -40,7 +40,7 @@ func TestMatchPartnersWithRequest(t *testing.T) {
 			name: "expect 1 partner to be returned, no error",
 			req: &apiv1.MatchPartnersWithRequestInput{
 				Material: "wood",
-				Location: "52.532566/13.396261",
+				Location: "52.532566:13.396261",
 			},
 			resp: &apiv1.MatchPartnersWithRequestOutput{
 				Partner: []*apiv1.Partner{
@@ -48,7 +48,7 @@ func TestMatchPartnersWithRequest(t *testing.T) {
 						Id:        uint32(1),
 						Materials: "WOOD",
 						Rating:    uint32(5),
-						Location:  "52.500000/13.400000",
+						Location:  "52.500000:13.400000",
 						Radius:    50000.,
 						Distance:  10000.,
 					},
@@ -75,7 +75,7 @@ func TestMatchPartnersWithRequest(t *testing.T) {
 			name: "expect 2 partner in same order, no error",
 			req: &apiv1.MatchPartnersWithRequestInput{
 				Material: "wood",
-				Location: "52.532566/13.396261",
+				Location: "52.532566:13.396261",
 			},
 			resp: &apiv1.MatchPartnersWithRequestOutput{
 				Partner: []*apiv1.Partner{
@@ -83,7 +83,7 @@ func TestMatchPartnersWithRequest(t *testing.T) {
 						Id:        uint32(2),
 						Materials: "WOOD, CARPET",
 						Rating:    uint32(4),
-						Location:  "52.400000/13.300000",
+						Location:  "52.400000:13.300000",
 						Radius:    50000.,
 						Distance:  10000.,
 					},
@@ -91,7 +91,7 @@ func TestMatchPartnersWithRequest(t *testing.T) {
 						Id:        uint32(1),
 						Materials: "WOOD",
 						Rating:    uint32(5),
-						Location:  "52.500000/13.400000",
+						Location:  "52.500000:13.400000",
 						Radius:    50000.,
 						Distance:  10000.,
 					},
@@ -131,7 +131,7 @@ func TestMatchPartnersWithRequest(t *testing.T) {
 			name: "expect error for non-existing material",
 			req: &apiv1.MatchPartnersWithRequestInput{
 				Material: "glass",
-				Location: "52.532566/13.396261",
+				Location: "52.532566:13.396261",
 			},
 			resp: &apiv1.MatchPartnersWithRequestOutput{},
 			err:  errors.New("could not parse material: material not supported [\"glass\"]"),
