@@ -1,5 +1,4 @@
 # Code generation
-/gen
 /ent/*
 !/ent/schema
 !/ent/migrations
