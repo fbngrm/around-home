@@ -3,6 +3,7 @@ package partner
 import (
 	"context"
 	"fmt"
+	"log"
 
 	ent "github.com/fbngrm/around-home/ent"
 	"github.com/fbngrm/around-home/ent/material"
@@ -10,12 +11,12 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type PartnerRepo struct {
-	db *ent.Client
+type Repo struct {
+	DB *ent.Client
 }
 
-func (r *PartnerRepo) GetPartnersWithMaterial(ctx context.Context, m materials.Material) ([]Partner, error) {
-	partners, err := r.db.Material.Query().Where(material.MaterialEQ(m)).QueryPartners().All(ctx)
+func (r *Repo) GetPartnersWithMaterial(ctx context.Context, m materials.Material) ([]Partner, error) {
+	partners, err := r.DB.Material.Query().Where(material.MaterialEQ(m)).QueryPartners().WithMaterials().All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not get partners with material [%v]: %w", m, err)
 	}
@@ -25,7 +26,14 @@ func (r *PartnerRepo) GetPartnersWithMaterial(ctx context.Context, m materials.M
 	// is a coding challenge
 	results := make([]Partner, len(partners))
 	for i, partner := range partners {
-		results[i] = toDomain(partner)
+		p, err := toDomain(partner)
+		// if conversion fails, we ignore this partner and return the valid ones
+		// in a real-world scenario, we would inject a logger and have a more advanced error handling
+		if err != nil {
+			log.Printf("warning: could not convert to domain Partner object, skipping [%d]: %s\n", partner.ID, err.Error())
+			continue
+		}
+		results[i] = p
 	}
 	return results, nil
 }

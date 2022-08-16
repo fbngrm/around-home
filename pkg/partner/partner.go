@@ -1,11 +1,14 @@
 package partner
 
-import materialsDomain "github.com/fbngrm/around-home/pkg/materials"
+import (
+	"github.com/fbngrm/around-home/pkg/location"
+	materialsDomain "github.com/fbngrm/around-home/pkg/materials"
+)
 
 type Partner struct {
-	materials         []materialsDomain.Material
-	name              string
-	address           string
-	rating            int
-	radiusOfOperation int
+	ID                int
+	Materials         []materialsDomain.Material
+	Address           location.Location
+	RadiusOfOperation float64 // in meters
+	Rating            int     // todo: add enum type
 }
