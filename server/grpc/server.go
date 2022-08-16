@@ -19,9 +19,7 @@ type Server struct {
 	server *grpc.Server
 }
 
-// NewServer returns an Server instance with a handler attached.
-// Note, handlers should implement a timeout to avoid running into transport
-// layer timeouts.
+// NewServer returns an Server instance with a service attached.
 func NewServer(ctx context.Context, db *ent.Client) (*Server, error) {
 	// deps
 	partnerRepo := &partner.Repo{DB: db}
