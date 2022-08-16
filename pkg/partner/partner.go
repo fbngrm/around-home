@@ -12,3 +12,14 @@ type Partner struct {
 	RadiusOfOperation float64 // in meters
 	Rating            int     // todo: add enum type
 }
+
+func (p Partner) MaterialsToString() string {
+	s := ""
+	for i, m := range p.Materials {
+		s += string(m)
+		if i < len(p.Materials)-1 {
+			s += ", "
+		}
+	}
+	return s
+}
